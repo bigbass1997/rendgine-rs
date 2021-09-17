@@ -14,12 +14,14 @@ pub struct Screen {
     pub video: VideoSubsystem,
 }
 impl Screen {
-    pub fn new(title: &str, width: u32, height: u32) -> Self {
+    pub fn new(title: &str, width: u32, height: u32, aa_buffers: Option<u8>, aa_samples: Option<u8>) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video = sdl_context.video().unwrap();
         let attr = video.gl_attr();
         attr.set_context_profile(GLProfile::Core);
         attr.set_context_version(4, 6);
+        attr.set_multisample_buffers(aa_buffers.unwrap_or(0));
+        attr.set_multisample_samples(aa_samples.unwrap_or(0));
         
         let window = video.window(title, width, height).opengl().build().unwrap();
         let gl_context = window.gl_create_context().unwrap();
@@ -33,6 +35,10 @@ impl Screen {
             gl::DepthMask(gl::TRUE);
             gl::DepthFunc(gl::LEQUAL);
             gl::DepthRange(0.0, 1.0);
+            
+            if attr.multisample_buffers() > 0 || attr.multisample_samples() > 0 {
+                gl::Enable(gl::MULTISAMPLE);
+            }
             
             gl::Viewport(0, 0, width as i32, height as i32);
         }
