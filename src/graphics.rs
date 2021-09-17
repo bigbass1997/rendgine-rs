@@ -150,9 +150,9 @@ impl VertexBufferObject {
             if self.dirty {
                 if self.usage == Usage::INDICES {
                     let intdata = Self::data_ints(&self.data);
-                    gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (intdata.len() * 8) as isize, intdata.as_ptr() as *const GLvoid, gl::DYNAMIC_DRAW);
+                    gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (intdata.len() * 4) as isize, intdata.as_ptr() as *const GLvoid, gl::DYNAMIC_DRAW);
                 } else {
-                    gl::BufferData(gl::ARRAY_BUFFER, (self.data.len() * 8) as isize, self.data.as_ptr() as *const GLvoid, gl::DYNAMIC_DRAW);
+                    gl::BufferData(gl::ARRAY_BUFFER, (self.data.len() * 4) as isize, self.data.as_ptr() as *const GLvoid, gl::DYNAMIC_DRAW);
                     gl::VertexAttribPointer(self.vbo_index, self.usage.offset().into(), gl::FLOAT, gl::FALSE, 0, std::ptr::null());
                 }
             }
