@@ -1,17 +1,20 @@
 [package]
 name = "rendgine-rs"
 version = "0.1.0"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
+build = "build.rs"
 
 [dependencies]
 gl = "0.14"
 cgmath = "0.18"
 strum = "0.21"
 strum_macros = "0.21"
+image = "0.23"
 
 [dependencies.sdl2]
-version = "0.34"
+version = "0.35"
 default-features = false
 features = ["ttf","image","gfx","mixer"]
+
+[build-dependencies]
+gl_generator = "0.14"

@@ -1,4 +1,7 @@
 
+/*mod gl {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}*/
 extern crate gl;
 
 use sdl2::video::{GLContext, Window, GLProfile, SwapInterval};

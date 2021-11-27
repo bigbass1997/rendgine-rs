@@ -3,7 +3,10 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use cgmath::Matrix4;
 use std::collections::HashMap;
+use std::ffi::c_void;
+use std::path::PathBuf;
 use gl::types::*;
+use image::{DynamicImage, GenericImageView, RgbaImage};
 
 #[derive(PartialEq, EnumIter, Clone, Copy)]
 pub enum Usage {
@@ -481,10 +484,8 @@ pub struct Mesh {
     attribs: VertexAttributes,
 }
 impl Mesh {
-    pub fn new() -> Mesh {
-        let attribs = VertexAttributes::with(true, true, false, false);
-        
-        Mesh {
+    pub fn new(attribs: VertexAttributes) -> Self {
+        Self {
             vao: VertexArrayObject::new(attribs),
             attribs: attribs,
         }
@@ -524,15 +525,15 @@ pub struct MeshRenderer {
     next_vertex: Vec<f32>,
 }
 impl MeshRenderer {
-    pub fn new(vertex_shader_code: &str, fragment_shader_code: &str) -> MeshRenderer {
+    pub fn new(vertex_shader_code: &str, fragment_shader_code: &str) -> Self {
         let mut shader = ShaderProgram::new();
         shader.create_vertex_shader(vertex_shader_code);
         shader.create_fragment_shader(fragment_shader_code);
         shader.link();
         
-        let mesh = Mesh::new();
+        let mesh = Mesh::new(VertexAttributes::with(true, true, false, false));
         let next = vec![0f32; mesh.attribs.vertex_size.into()];
-        MeshRenderer {
+        Self {
             shader: shader,
             mesh: mesh,
             next_vertex: next,
@@ -588,6 +589,215 @@ impl MeshRenderer {
     
     pub fn clear(&mut self) {
         self.mesh.clear();
+        self.next_vertex.fill(0.0);
+    }
+}
+
+
+pub struct Texture {
+    id: u32,
+    width: u32,
+    height: u32,
+    original_image: RgbaImage,
+}
+impl Texture {
+    pub fn from_path(path: &PathBuf) -> Self {
+        let img = image::open(path).unwrap().into_rgba8();
+        
+        Self::from_image(img)
+    }
+    
+    pub fn from_image(mut img: RgbaImage) -> Self {
+        img = image::imageops::flip_vertical(&img);
+        
+        let width = img.width();
+        let height = img.height();
+        let original_image = img.clone();
+        
+        Self {
+            id: Self::gl_gen(img),
+            width,
+            height,
+            original_image,
+        }
+    }
+    
+    fn gl_gen(img: RgbaImage) -> u32 {
+        let mut id = 0;
+        
+        unsafe {
+            gl::GenTextures(1, &mut id);
+            
+            gl::BindTexture(gl::TEXTURE_2D, id);
+            gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as GLint);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+            
+            gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as GLint, img.width() as GLsizei, img.height() as GLsizei, 0, gl::RGBA, gl::UNSIGNED_BYTE, img.into_raw().as_ptr() as *const c_void);
+            
+            gl::GenerateMipmap(gl::TEXTURE_2D);
+            gl::BindTexture(gl::TEXTURE_2D, 0);
+        }
+        
+        id
+    }
+    
+    pub fn bind(&self) {
+        unsafe {
+            gl::BindTexture(gl::TEXTURE_2D, self.id);
+        }
+    }
+    
+    /// Returns a clone of this image, with every pixel multiplied by the provided color
+    pub fn multiply(&self, r: f32, g: f32, b: f32, a: f32) -> Self {
+        let mut img = self.original_image.clone();
+        img.pixels_mut().for_each(|pixel| {
+            pixel.0[0] = ((pixel.0[0] as f32) * r) as u8;
+            pixel.0[1] = ((pixel.0[1] as f32) * g) as u8;
+            pixel.0[2] = ((pixel.0[2] as f32) * b) as u8;
+            pixel.0[3] = ((pixel.0[3] as f32) * a) as u8;
+        });
+        
+        Self::from_image(img)
+    }
+}
+impl Drop for Texture {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteTextures(1, &mut self.id);
+        }
+    }
+}
+
+
+
+pub struct TextureRenderer<'a> {
+    shader: ShaderProgram,
+    mesh: Mesh,
+    next_vertex: Vec<f32>,
+    last_tex: Option<&'a Texture>,
+    combined: Option<&'a Matrix4<f32>>,
+    dirty: bool,
+}
+impl<'a> TextureRenderer<'a> {
+    pub fn new(vertex_shader_code: &str, fragment_shader_code: &str) -> Self {
+        let mut shader = ShaderProgram::new();
+        shader.create_vertex_shader(vertex_shader_code);
+        shader.create_fragment_shader(fragment_shader_code);
+        shader.link();
+        
+        let mesh = Mesh::new(VertexAttributes::with(true, true, false, true));
+        let next = vec![0f32; mesh.attribs.vertex_size.into()];
+        Self {
+            shader: shader,
+            mesh: mesh,
+            next_vertex: next,
+            last_tex: None,
+            combined: None,
+            dirty: false,
+        }
+    }
+    
+    pub fn begin(&mut self, combined: &'a Matrix4<f32>) {
+        self.combined = Some(combined);
+        
+        unsafe {
+            gl::Enable(gl::BLEND);
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+        }
+    }
+    
+    pub fn flush(&mut self) {
+        if self.last_tex.is_none() || self.combined.is_none() { return }
+        
+        self.last_tex.unwrap().bind();
+        
+        self.shader.set_uniform1i32("textureSampler", 0);
+        self.mesh.render(&self.shader, false, gl::TRIANGLES, self.combined.unwrap().clone());
+        self.mesh.clear();
+        self.dirty = false;
+    }
+    
+    pub fn end(&mut self) {
+        if self.dirty {
+            self.flush();
+        }
+        
+        unsafe {
+            gl::Disable(gl::BLEND);
+        }
+        
+        self.combined = None;
+        self.last_tex = None;
+    }
+    
+    //todo: Texture and TextureRegion methods
+    pub fn texture_xy(&mut self, tex: &'a Texture, x: f32, y: f32) {
+        self.texture(tex, x, y, tex.width as f32, tex.height as f32, 0.0, 0.0, 1.0, 1.0);
+    }
+    
+    pub fn texture(&mut self, tex: &'a Texture, x: f32, y: f32, width: f32, height: f32, u: f32, v: f32, u2: f32, v2: f32) {
+        if self.last_tex.is_none() {
+            self.last_tex = Some(tex);
+        }
+        
+        if self.last_tex.is_some() && self.last_tex.unwrap().id != tex.id {
+            self.flush();
+            self.last_tex = Some(tex);
+        }
+        
+        self.dirty = true;
+        
+        self.color(1.0, 1.0, 1.0, 1.0);
+        self.tex_coord(u, v);
+        self.vertex(x, y, 0.0);
+        
+        self.color(1.0, 1.0, 1.0, 1.0);
+        self.tex_coord(u, v2);
+        self.vertex(x, y + height, 0.0);
+        
+        self.color(1.0, 1.0, 1.0, 1.0);
+        self.tex_coord(u2, v2);
+        self.vertex(x + width, y + height, 0.0);
+        
+        
+        self.color(1.0, 1.0, 1.0, 1.0);
+        self.tex_coord(u2, v2);
+        self.vertex(x + width, y + height, 0.0);
+        
+        self.color(1.0, 1.0, 1.0, 1.0);
+        self.tex_coord(u2, v);
+        self.vertex(x + width, y, 0.0);
+        
+        self.color(1.0, 1.0, 1.0, 1.0);
+        self.tex_coord(u, v);
+        self.vertex(x, y, 0.0);
+    }
+    
+    pub fn tex_coord(&mut self, u: f32, v: f32) {
+        if self.mesh.attribs.has_tex_coords {
+            let offset = self.mesh.get_vertex_offset(Usage::TEXCOORDS) as usize;
+            self.next_vertex[offset] = u;
+            self.next_vertex[offset+1] = v;
+        }
+    }
+    
+    pub fn color(&mut self, r: f32, g: f32, b: f32, a: f32) {
+        if self.mesh.attribs.has_colors {
+            let offset = self.mesh.get_vertex_offset(Usage::COLORS) as usize;
+            self.next_vertex[offset] = r;
+            self.next_vertex[offset+1] = g;
+            self.next_vertex[offset+2] = b;
+            self.next_vertex[offset+3] = a;
+        }
+    }
+    
+    pub fn vertex(&mut self, x: f32, y: f32, z: f32) {
+        self.next_vertex[0] = x;
+        self.next_vertex[1] = y;
+        self.next_vertex[2] = z;
+        self.mesh.vertex(&self.next_vertex);
+        
         self.next_vertex.fill(0.0);
     }
 }
