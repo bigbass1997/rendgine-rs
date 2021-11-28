@@ -387,7 +387,6 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "gl",
- "gl_generator",
  "image",
  "sdl2",
  "strum",

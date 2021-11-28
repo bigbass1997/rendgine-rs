@@ -1,4 +1,4 @@
-
+/*
 extern crate gl_generator;
 
 use gl_generator::{Api, Fallbacks, GlobalGenerator, Profile, Registry};
@@ -13,4 +13,6 @@ fn main() {
     Registry::new(Api::Gl, (4, 6), Profile::Core, Fallbacks::All, [])
         .write_bindings(GlobalGenerator, &mut file)
         .unwrap();
-}
+}*/
+
+fn main() {}

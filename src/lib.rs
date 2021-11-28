@@ -9,6 +9,7 @@ use sdl2::{Sdl, VideoSubsystem};
 
 pub mod graphics;
 pub mod camera;
+pub mod font;
 
 pub struct Screen {
     pub sdl_context: Sdl,

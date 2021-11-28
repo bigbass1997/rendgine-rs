@@ -2,7 +2,7 @@
 name = "rendgine-rs"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
+#build = "build.rs"
 
 [dependencies]
 gl = "0.14"
@@ -16,5 +16,5 @@ version = "0.35"
 default-features = false
 features = ["ttf","image","gfx","mixer"]
 
-[build-dependencies]
-gl_generator = "0.14"
+#[build-dependencies]
+#gl_generator = "0.14"

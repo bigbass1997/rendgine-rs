@@ -594,10 +594,11 @@ impl MeshRenderer {
 }
 
 
+#[derive(Debug)]
 pub struct Texture {
     id: u32,
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
     original_image: RgbaImage,
 }
 impl Texture {
@@ -731,12 +732,15 @@ impl<'a> TextureRenderer<'a> {
         self.last_tex = None;
     }
     
-    //todo: Texture and TextureRegion methods
     pub fn texture_xy(&mut self, tex: &'a Texture, x: f32, y: f32) {
-        self.texture(tex, x, y, tex.width as f32, tex.height as f32, 0.0, 0.0, 1.0, 1.0);
+        self.texture_white(tex, x, y, tex.width as f32, tex.height as f32, 0.0, 0.0, 1.0, 1.0);
     }
     
-    pub fn texture(&mut self, tex: &'a Texture, x: f32, y: f32, width: f32, height: f32, u: f32, v: f32, u2: f32, v2: f32) {
+    pub fn texture_white(&mut self, tex: &'a Texture, x: f32, y: f32, width: f32, height: f32, u: f32, v: f32, u2: f32, v2: f32) {
+        self.texture(tex, x, y, width, height, u, v, u2, v2, 1.0, 1.0, 1.0, 1.0);
+    }
+    
+    pub fn texture(&mut self, tex: &'a Texture, x: f32, y: f32, width: f32, height: f32, u: f32, v: f32, u2: f32, v2: f32, r: f32, g: f32, b: f32, a: f32) {
         if self.last_tex.is_none() {
             self.last_tex = Some(tex);
         }
@@ -748,28 +752,28 @@ impl<'a> TextureRenderer<'a> {
         
         self.dirty = true;
         
-        self.color(1.0, 1.0, 1.0, 1.0);
+        self.color(r, g, b, a);
         self.tex_coord(u, v);
         self.vertex(x, y, 0.0);
         
-        self.color(1.0, 1.0, 1.0, 1.0);
+        self.color(r, g, b, a);
         self.tex_coord(u, v2);
         self.vertex(x, y + height, 0.0);
         
-        self.color(1.0, 1.0, 1.0, 1.0);
+        self.color(r, g, b, a);
         self.tex_coord(u2, v2);
         self.vertex(x + width, y + height, 0.0);
         
         
-        self.color(1.0, 1.0, 1.0, 1.0);
+        self.color(r, g, b, a);
         self.tex_coord(u2, v2);
         self.vertex(x + width, y + height, 0.0);
         
-        self.color(1.0, 1.0, 1.0, 1.0);
+        self.color(r, g, b, a);
         self.tex_coord(u2, v);
         self.vertex(x + width, y, 0.0);
         
-        self.color(1.0, 1.0, 1.0, 1.0);
+        self.color(r, g, b, a);
         self.tex_coord(u, v);
         self.vertex(x, y, 0.0);
     }
