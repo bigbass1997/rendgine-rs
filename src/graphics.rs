@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 use std::path::PathBuf;
 use gl::types::*;
-use image::{DynamicImage, GenericImageView, RgbaImage};
+use image::RgbaImage;
 
 #[derive(PartialEq, EnumIter, Clone, Copy)]
 pub enum Usage {
@@ -551,6 +551,32 @@ impl MeshRenderer {
         }
     }
     
+    
+    pub fn rect(&mut self, x: f32, y: f32, width: f32, height: f32, r: f32, g: f32, b: f32, a: f32) {
+        self.tri(
+            x, y, 0.0,
+            x + width, y, 0.0,
+            x + width, y + height, 0.0,
+            r, g, b, a
+        );
+        self.tri(
+            x, y, 0.0,
+            x + width, y + height, 0.0,
+            x, y + height, 0.0,
+            r, g, b, a
+        );
+    }
+    
+    pub fn tri(&mut self, x0: f32, y0: f32, z0: f32, x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32, r: f32, g: f32, b: f32, a: f32) {
+        self.color(r, g, b, a);
+        self.vertex(x0, y0, z0);
+        self.color(r, g, b, a);
+        self.vertex(x1, y1, z1);
+        self.color(r, g, b, a);
+        self.vertex(x2, y2, z2);
+    }
+    
+    
     pub fn color(&mut self, r: f32, g: f32, b: f32, a: f32) {
         if self.mesh.attribs.has_colors {
             let offset = self.mesh.get_vertex_offset(Usage::COLORS) as usize;
@@ -677,7 +703,7 @@ pub struct TextureRenderer<'a> {
     mesh: Mesh,
     next_vertex: Vec<f32>,
     last_tex: Option<&'a Texture>,
-    combined: Option<&'a Matrix4<f32>>,
+    combined: Option<Matrix4<f32>>,
     dirty: bool,
 }
 impl<'a> TextureRenderer<'a> {
@@ -699,7 +725,7 @@ impl<'a> TextureRenderer<'a> {
         }
     }
     
-    pub fn begin(&mut self, combined: &'a Matrix4<f32>) {
+    pub fn begin(&mut self, combined: Matrix4<f32>) {
         self.combined = Some(combined);
         
         unsafe {
